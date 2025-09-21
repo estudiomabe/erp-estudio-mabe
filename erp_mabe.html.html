@@ -26,8 +26,8 @@
         <!-- User ID and Status Section -->
         <div class="bg-gray-100 p-4 rounded-xl shadow-md">
             <p class="text-sm font-medium">Status de Autenticação:</p>
-            <p id="auth-status" class="text-sm font-light text-green-700">Autenticado com sucesso!</p>
-            <p id="user-id-display" class="text-xs mt-2 break-all text-gray-600">ID do Usuário: Localhost_user_id</p>
+            <p id="auth-status" class="text-sm font-light text-green-700">Autenticando...</p>
+            <p id="user-id-display" class="text-xs mt-2 break-all text-gray-600"></p>
         </div>
 
         <!-- Main Content Area -->
@@ -248,27 +248,19 @@
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, addDoc, onSnapshot, query, where, orderBy, serverTimestamp, getDoc, getDocs, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
-        // Firestore security rules require this variable. Do NOT remove.
-        // It is defined here for local use only.
-        const appId = 'local-app-id';
+        // As seguintes variáveis são fornecidas automaticamente pelo ambiente.
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'local-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-        // --- Firebase Initialization and Auth ---
-        const app = initializeApp({
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_AUTH_DOMAIN",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_STORAGE_BUCKET",
-            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-            appId: "YOUR_APP_ID"
-        });
+        const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-        
-        // Since we are running this locally, authentication is disabled.
         const auth = getAuth(app);
-        let userId = 'local_user_id';
+        
+        let userId;
         let loggedInEmployee = null;
         let currentView = 'login'; // 'login', 'admin_login', 'dashboard', 'admin', 'employee', 'change_password', 'project_admin'
         
@@ -327,7 +319,30 @@
         
         let selectedDate = new Date();
 
-        // No onAuthStateChanged for local use
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                userId = user.uid;
+                authStatusEl.textContent = 'Autenticado com sucesso!';
+                authStatusEl.classList.remove('text-red-700');
+                authStatusEl.classList.add('text-green-700');
+                userIdDisplayEl.textContent = `ID do Usuário: ${userId}`;
+                updateView();
+            } else {
+                authStatusEl.textContent = 'Não autenticado. Tentando autenticar...';
+                try {
+                    if (initialAuthToken) {
+                        await signInWithCustomToken(auth, initialAuthToken);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                } catch (error) {
+                    console.error("Falha na autenticação:", error);
+                    authStatusEl.textContent = 'Falha na autenticação. Por favor, recarregue a página.';
+                    authStatusEl.classList.remove('text-green-700');
+                    authStatusEl.classList.add('text-red-700');
+                }
+            }
+        });
 
         // --- Firestore Collections Pathing ---
         const getEmployeesCollectionRef = () => collection(db, `artifacts/${appId}/users/${userId}/employees`);
