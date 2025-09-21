@@ -253,7 +253,7 @@
         
         // As seguintes variáveis são fornecidas automaticamente pelo ambiente.
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'local-app-id';
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' && __firebase_config ? __firebase_config : '{}');
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
         const app = initializeApp(firebaseConfig);
@@ -486,13 +486,17 @@
             let totalMilliseconds = 0;
             let lastEntry = null;
             
-            // Sort records by timestamp
-            records.sort((a, b) => a.timestamp.toMillis() - b.timestamp.toMillis());
+            // Sort records by timestamp, handling null or undefined timestamps
+            records.sort((a, b) => {
+                const timeA = a.timestamp ? a.timestamp.toMillis() : 0;
+                const timeB = b.timestamp ? b.timestamp.toMillis() : 0;
+                return timeA - timeB;
+            });
 
             for (const record of records) {
-                if (record.type === 'entrada') {
+                if (record.type === 'entrada' && record.timestamp) {
                     lastEntry = record.timestamp.toMillis();
-                } else if (record.type === 'saida' && lastEntry !== null) {
+                } else if (record.type === 'saida' && lastEntry !== null && record.timestamp) {
                     const duration = record.timestamp.toMillis() - lastEntry;
                     totalMilliseconds += duration;
                     lastEntry = null; // Reset for the next pair
@@ -649,8 +653,8 @@
                             const end = new Date(year, month, 0, 23, 59, 59, 999).getTime();
 
                             const filteredRecords = allTimeRecords.filter(record => {
-                                const recordTime = record.timestamp.toMillis();
-                                return recordTime >= start && recordTime <= end;
+                                const recordTime = record.timestamp ? record.timestamp.toMillis() : null;
+                                return recordTime !== null && recordTime >= start && recordTime <= end;
                             });
                             updateUIWithFilteredData(filteredRecords);
                         } else {
@@ -943,3 +947,4 @@
     </script>
 </body>
 </html>
+
